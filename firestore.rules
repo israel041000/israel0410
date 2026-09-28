@@ -1,0 +1,57 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidArticle(data) {
+      return data.keys().hasAll(['title', 'category', 'scope', 'content', 'status'])
+        && data.keys().hasOnly([
+          'id', 'title', 'subtitle', 'category', 'scope', 'stateSigla', 
+          'stateName', 'cityName', 'author', 'publishedAt', 'updatedAt', 
+          'imageUrl', 'caption', 'content', 'inlineImages', 'featured', 
+          'isHeroLead', 'views', 'tags', 'status'
+        ])
+        && data.title is string && data.title.size() <= 200
+        && data.category is string && data.category.size() <= 50
+        && data.scope in ['Nacional', 'Estadual', 'Municipal']
+        && data.content is string && data.content.size() <= 50000
+        && data.status in ['publicado', 'rascunho'];
+    }
+
+    match /articles/{articleId} {
+      allow read: if true;
+      allow create: if isValidId(articleId) && isValidArticle(incoming());
+      allow update: if isValidId(articleId) && isValidArticle(incoming());
+      allow delete: if isValidId(articleId);
+    }
+
+    match /admins/{adminId} {
+      allow read: if true;
+      allow write: if isValidId(adminId);
+    }
+
+    match /test/connection {
+      allow read: if true;
+    }
+  }
+}
